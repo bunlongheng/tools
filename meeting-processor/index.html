@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meeting Processor — Tools</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #f6f8fa;
+      --surface:  #ffffff;
+      --border:   #d0d7de;
+      --text:     #1f2328;
+      --muted:    #656d76;
+      --accent:   #0969da;
+      --green:    #1a7f37;
+      --green-bg: #dafbe1;
+      --tag-bg:   #ddf4ff;
+      --code-bg:  #f0f2f4;
+      --step-1:   #0969da;
+      --step-2:   #8250df;
+      --step-3:   #1a7f37;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    /* ── nav ── */
+    nav {
+      height: 48px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 24px;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--muted);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    nav a { color: var(--accent); text-decoration: none; font-weight: 500; }
+    nav a:hover { text-decoration: underline; }
+    nav .sep { color: var(--border); }
+
+    /* ── hero ── */
+    .hero {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 56px 24px 48px;
+      text-align: center;
+    }
+    .hero-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+    .hero h1 {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+    .hero p {
+      font-size: 16px;
+      color: var(--muted);
+      max-width: 480px;
+      margin: 0 auto 20px;
+    }
+    .badge-row {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .badge {
+      font-size: 12px;
+      font-weight: 500;
+      padding: 4px 10px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--muted);
+    }
+    .badge.free { background: var(--green-bg); color: var(--green); border-color: #b7e3c4; }
+    .badge.paid { background: #fff8c5; color: #9a6700; border-color: #e3c26b; }
+
+    /* ── content ── */
+    .content {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 48px 24px 80px;
+    }
+
+    section { margin-bottom: 48px; }
+
+    h2 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    h3 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: var(--text);
+    }
+
+    p { font-size: 14px; color: var(--muted); margin-bottom: 12px; }
+    p strong { color: var(--text); }
+
+    /* ── pipeline flow ── */
+    .flow {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      flex-wrap: wrap;
+    }
+    .flow-step {
+      flex: 1;
+      min-width: 140px;
+      padding: 20px 16px;
+      text-align: center;
+      position: relative;
+    }
+    .flow-step + .flow-step::before {
+      content: '→';
+      position: absolute;
+      left: -10px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 18px;
+      color: var(--border);
+      font-weight: 300;
+    }
+    .flow-step-icon { font-size: 28px; margin-bottom: 8px; }
+    .flow-step-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .8px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .flow-step-tool {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+    .flow-step-desc { font-size: 12px; color: var(--muted); }
+    .flow-step-cost {
+      display: inline-block;
+      margin-top: 6px;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 8px;
+      border-radius: 20px;
+    }
+    .cost-free { background: var(--green-bg); color: var(--green); }
+    .cost-paid { background: #fff8c5; color: #9a6700; }
+
+    /* ── cost table ── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13.5px;
+    }
+    th {
+      background: var(--bg);
+      font-weight: 600;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      text-align: left;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: var(--muted);
+    }
+    td { padding: 10px 14px; border: 1px solid var(--border); }
+    tr:nth-child(even) td { background: var(--bg); }
+    .check { color: var(--green); font-weight: 600; }
+    .cross { color: #cf222e; }
+
+    /* ── setup steps ── */
+    .setup-steps { display: flex; flex-direction: column; gap: 16px; }
+    .step {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .step-num {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .step-body { flex: 1; }
+    .step-title { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+
+    /* ── code blocks ── */
+    .code-block {
+      position: relative;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      margin: 10px 0;
+      overflow: hidden;
+    }
+    .code-lang {
+      font-size: 11px;
+      font-weight: 500;
+      color: #8b949e;
+      padding: 8px 16px 6px;
+      border-bottom: 1px solid #21262d;
+      font-family: 'JetBrains Mono', monospace;
+      background: #161b22;
+    }
+    .code-block pre {
+      padding: 16px;
+      overflow-x: auto;
+      margin: 0;
+    }
+    .code-block code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      line-height: 1.7;
+      color: #e6edf3;
+      white-space: pre;
+    }
+    .copy-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      padding: 4px 10px;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #8b949e;
+      font-size: 11px;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      transition: background .15s, color .15s;
+    }
+    .copy-btn:hover { background: #30363d; color: #e6edf3; }
+    .copy-btn.copied { color: #3fb950; border-color: #3fb950; }
+
+    /* ── file output preview ── */
+    .output-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .output-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot.green { background: #3fb950; }
+    .dot.yellow { background: #d29922; }
+    .dot.blue { background: #58a6ff; }
+    .output-files { padding: 12px 16px; }
+    .output-file {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 0;
+      font-size: 13px;
+      border-bottom: 1px solid var(--bg);
+    }
+    .output-file:last-child { border-bottom: none; }
+    .output-file-icon { font-size: 16px; }
+    .output-file-name { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text); }
+    .output-file-desc { color: var(--muted); font-size: 12px; margin-left: auto; }
+
+    /* ── whisper model table ── */
+    .model-recommended { font-weight: 600; color: var(--accent); }
+
+    /* ── cta ── */
+    .cta {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px;
+      text-align: center;
+    }
+    .cta h3 { font-size: 16px; margin-bottom: 8px; }
+    .cta p { font-size: 13px; margin-bottom: 16px; }
+    .cta-btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      font-family: 'Inter', sans-serif;
+      text-decoration: none;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      transition: background .15s, border-color .15s;
+    }
+    .btn:hover { background: var(--border); }
+    .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn.primary:hover { background: #0860ca; }
+  </style>
+</head>
+<body>
+
+<!-- nav -->
+<nav>
+  <a href="../">Tools</a>
+  <span class="sep">/</span>
+  <span>Meeting Processor</span>
+</nav>
+
+<!-- hero -->
+<div class="hero">
+  <div class="hero-icon">🎙️</div>
+  <h1>Meeting Processor</h1>
+  <p>Drop a video into a folder. Get structured AI meeting notes automatically.</p>
+  <div class="badge-row">
+    <span class="badge free">ffmpeg — free</span>
+    <span class="badge free">Whisper — free</span>
+    <span class="badge paid">Claude API — ~$0.02/meeting</span>
+    <span class="badge">macOS only</span>
+  </div>
+</div>
+
+<div class="content">
+
+  <!-- pipeline -->
+  <section>
+    <h2>How it works</h2>
+    <div class="flow">
+      <div class="flow-step">
+        <div class="flow-step-icon">🎬</div>
+        <div class="flow-step-label">Input</div>
+        <div class="flow-step-tool">Video file</div>
+        <div class="flow-step-desc">.mp4 .mov .mkv .avi</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-step-icon">🔊</div>
+        <div class="flow-step-label">Step 1</div>
+        <div class="flow-step-tool">ffmpeg</div>
+        <div class="flow-step-desc">Extract audio</div>
+        <div class="flow-step-cost cost-free">Free</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-step-icon">✍️</div>
+        <div class="flow-step-label">Step 2</div>
+        <div class="flow-step-tool">Whisper</div>
+        <div class="flow-step-desc">Speech → text (local)</div>
+        <div class="flow-step-cost cost-free">Free · offline</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-step-icon">🤖</div>
+        <div class="flow-step-label">Step 3</div>
+        <div class="flow-step-tool">Claude API</div>
+        <div class="flow-step-desc">AI meeting notes</div>
+        <div class="flow-step-cost cost-paid">~$0.02 / meeting</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-step-icon">📄</div>
+        <div class="flow-step-label">Output</div>
+        <div class="flow-step-tool">Markdown notes</div>
+        <div class="flow-step-desc">Auto-opens on Mac</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- output -->
+  <section>
+    <h2>Output files</h2>
+    <p>Every video produces 3 files in <strong>~/Documents/MeetingNotes/</strong>:</p>
+    <div class="output-box">
+      <div class="output-header">
+        <div class="dot green"></div>
+        <span>~/Documents/MeetingNotes/</span>
+      </div>
+      <div class="output-files">
+        <div class="output-file">
+          <span class="output-file-icon">🔊</span>
+          <span class="output-file-name">meeting-name.mp3</span>
+          <span class="output-file-desc">extracted audio</span>
+        </div>
+        <div class="output-file">
+          <span class="output-file-icon">📃</span>
+          <span class="output-file-name">meeting-name.txt</span>
+          <span class="output-file-desc">raw transcript</span>
+        </div>
+        <div class="output-file">
+          <span class="output-file-icon">📝</span>
+          <span class="output-file-name">meeting-name-notes.md</span>
+          <span class="output-file-desc">AI notes — auto-opens</span>
+        </div>
+      </div>
+    </div>
+
+    <br>
+    <p>The <strong>-notes.md</strong> file contains:</p>
+    <div class="code-block">
+      <div class="code-lang">markdown — example output</div>
+      <pre><code># Meeting Notes: standup-feb-20
+
+## 1. Meeting Summary
+Team aligned on Q1 roadmap. Auth refactor is priority #1.
+
+## 2. Action Items
+- [ ] Write auth spec — @Sara (due: Wednesday)
+- [ ] Budget approval — @Mark (due: no date)
+
+## 3. Key Decisions
+- Auth refactor ships before March 15 release
+
+## 4. Open Questions
+- Will new infra be ready in time?
+
+## 5. Next Steps
+- Next standup: Monday 9am
+
+## 6. Notable Insights
+- Auth delay could block the entire release</code></pre>
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+    </div>
+  </section>
+
+  <!-- cost -->
+  <section>
+    <h2>Cost</h2>
+    <table>
+      <tr><th>Tool</th><th>Cost</th><th>Runs locally</th><th>Internet needed</th></tr>
+      <tr>
+        <td><strong>ffmpeg</strong></td>
+        <td><span class="check">Free</span></td>
+        <td><span class="check">✓</span></td>
+        <td><span class="cross">✗</span></td>
+      </tr>
+      <tr>
+        <td><strong>fswatch</strong></td>
+        <td><span class="check">Free</span></td>
+        <td><span class="check">✓</span></td>
+        <td><span class="cross">✗</span></td>
+      </tr>
+      <tr>
+        <td><strong>OpenAI Whisper</strong></td>
+        <td><span class="check">Free</span></td>
+        <td><span class="check">✓</span></td>
+        <td><span class="cross">✗</span></td>
+      </tr>
+      <tr>
+        <td><strong>Claude API</strong></td>
+        <td>~$0.01–$0.05 / meeting</td>
+        <td><span class="cross">✗</span></td>
+        <td><span class="check">✓</span></td>
+      </tr>
+    </table>
+    <p style="margin-top:10px">Get your API key at <strong>console.anthropic.com</strong> — free credits included on signup.</p>
+  </section>
+
+  <!-- whisper models -->
+  <section>
+    <h2>Whisper model options</h2>
+    <p>Change <code style="background:var(--code-bg);padding:2px 6px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:12px">WHISPER_MODEL</code> in <code style="background:var(--code-bg);padding:2px 6px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:12px">watch.sh</code> line 14:</p>
+    <table>
+      <tr><th>Model</th><th>Size</th><th>Speed</th><th>Accuracy</th><th>Best for</th></tr>
+      <tr><td>tiny</td><td>75 MB</td><td>Fastest</td><td>Basic</td><td>Quick tests</td></tr>
+      <tr><td class="model-recommended">base ✓</td><td>145 MB</td><td>Fast</td><td>Good</td><td>Clear audio (default)</td></tr>
+      <tr><td>small</td><td>465 MB</td><td>Moderate</td><td>Better</td><td>Accented speech</td></tr>
+      <tr><td>medium</td><td>1.5 GB</td><td>Slow</td><td>Great</td><td>Noisy background</td></tr>
+      <tr><td>large</td><td>3 GB</td><td>Slowest</td><td>Best</td><td>Multiple speakers</td></tr>
+    </table>
+  </section>
+
+  <!-- setup -->
+  <section>
+    <h2>Setup</h2>
+    <div class="setup-steps">
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Install system tools</div>
+          <div class="code-block">
+            <div class="code-lang">bash</div>
+            <pre><code>brew install ffmpeg fswatch</code></pre>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Create folders</div>
+          <div class="code-block">
+            <div class="code-lang">bash</div>
+            <pre><code>mkdir -p ~/Desktop/Videos ~/Documents/MeetingNotes ~/meeting-processor</code></pre>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">Set up Python environment</div>
+          <div class="code-block">
+            <div class="code-lang">bash</div>
+            <pre><code>python3.13 -m venv ~/meeting-processor/venv
+source ~/meeting-processor/venv/bin/activate
+pip install openai-whisper anthropic</code></pre>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <div class="step-title">Add your Anthropic API key</div>
+          <div class="code-block">
+            <div class="code-lang">bash</div>
+            <pre><code># Add to ~/.zshrc
+export ANTHROPIC_API_KEY="sk-ant-..."</code></pre>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-body">
+          <div class="step-title">Add API key to LaunchAgent then load it</div>
+          <div class="code-block">
+            <div class="code-lang">bash</div>
+            <pre><code># Edit the plist and replace YOUR_ANTHROPIC_API_KEY_HERE
+nano ~/Library/LaunchAgents/com.hengb01.meeting-processor.plist
+
+# Load (auto-starts on login from now on)
+launchctl load ~/Library/LaunchAgents/com.hengb01.meeting-processor.plist</code></pre>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-body">
+          <div class="step-title">Test it</div>
+          <div class="code-block">
+            <div class="code-lang">bash</div>
+            <pre><code># Drop any video into the watch folder
+cp any-meeting.mp4 ~/Desktop/Videos/
+
+# Watch progress live
+tail -f ~/meeting-processor/processor.log</code></pre>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- day to day -->
+  <section>
+    <h2>Day-to-day commands</h2>
+    <div class="code-block">
+      <div class="code-lang">bash</div>
+      <pre><code># Check service is running
+launchctl list | grep meeting-processor
+
+# Watch live log
+tail -f ~/meeting-processor/processor.log
+
+# Stop the service
+launchctl unload ~/Library/LaunchAgents/com.hengb01.meeting-processor.plist
+
+# Start the service
+launchctl load ~/Library/LaunchAgents/com.hengb01.meeting-processor.plist
+
+# Run manually in terminal (for debugging)
+~/meeting-processor/watch.sh</code></pre>
+      <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+    </div>
+  </section>
+
+  <!-- cta -->
+  <div class="cta">
+    <h3>Ready to set it up?</h3>
+    <p>Read the full architecture doc for deep-dive diagrams and code walkthroughs.</p>
+    <div class="cta-btns">
+      <a class="btn primary" href="./ARCHITECTURE.md" target="_blank">View ARCHITECTURE.md</a>
+      <a class="btn" href="../md/?load=../meeting-processor/ARCHITECTURE.md">Open in MD Viewer</a>
+      <a class="btn" href="../">← All Tools</a>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function copyCode(btn) {
+  const code = btn.closest('.code-block').querySelector('code').innerText;
+  navigator.clipboard.writeText(code).then(() => {
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+</script>
+</body>
+</html>
