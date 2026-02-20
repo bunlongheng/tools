@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>System Design: Creator Video Upload Notification</title>
+  <style>
+    :root {
+      --bg:        #0d1117;
+      --surface:   #161b22;
+      --border:    #30363d;
+      --text:      #e6edf3;
+      --muted:     #8b949e;
+      --blue:      #58a6ff;
+      --green:     #3fb950;
+      --yellow:    #d29922;
+      --red:       #f85149;
+      --purple:    #bc8cff;
+      --orange:    #ffa657;
+      --cyan:      #39d5d5;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      padding: 40px 24px 80px;
+    }
+
+    .container { max-width: 1000px; margin: 0 auto; }
+
+    /* ── Header ── */
+    header { text-align: center; margin-bottom: 56px; }
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--blue);
+      margin-bottom: 8px;
+    }
+    header p { color: var(--muted); font-size: 0.95rem; }
+
+    /* ── Section titles ── */
+    h2 {
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin: 48px 0 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    h2::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--blue);
+      margin: 24px 0 10px;
+    }
+
+    /* ── Architecture diagram ── */
+    .diagram-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .layer {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      background: var(--surface);
+      position: relative;
+    }
+
+    .layer-label {
+      position: absolute;
+      top: -12px;
+      left: 20px;
+      background: var(--bg);
+      padding: 2px 10px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+    }
+
+    .layer-label.write  { color: var(--blue);   border-color: var(--blue); }
+    .layer-label.fanout { color: var(--yellow);  border-color: var(--yellow); }
+    .layer-label.notif  { color: var(--green);   border-color: var(--green); }
+
+    /* arrow between layers */
+    .layer-arrow {
+      text-align: center;
+      font-size: 1.4rem;
+      color: var(--muted);
+      margin: 2px 0;
+    }
+
+    /* ── Node boxes ── */
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .node {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 18px;
+      text-align: center;
+      min-width: 130px;
+      background: var(--bg);
+      flex-shrink: 0;
+    }
+    .node .icon { font-size: 1.6rem; display: block; margin-bottom: 6px; }
+    .node .label { font-size: 0.8rem; font-weight: 600; color: var(--text); }
+    .node .sub   { font-size: 0.7rem; color: var(--muted); margin-top: 3px; }
+
+    .node.blue   { border-color: var(--blue);   background: rgba(88,166,255,.07); }
+    .node.green  { border-color: var(--green);  background: rgba(63,185,80,.07); }
+    .node.yellow { border-color: var(--yellow); background: rgba(210,153,34,.07); }
+    .node.red    { border-color: var(--red);    background: rgba(248,81,73,.07); }
+    .node.purple { border-color: var(--purple); background: rgba(188,140,255,.07); }
+    .node.cyan   { border-color: var(--cyan);   background: rgba(57,213,213,.07); }
+    .node.orange { border-color: var(--orange); background: rgba(255,166,87,.07); }
+
+    .arrow { font-size: 1.2rem; color: var(--muted); flex-shrink: 0; }
+
+    /* ── Flow steps ── */
+    .flow { display: flex; flex-direction: column; gap: 0; }
+    .flow-step {
+      display: flex;
+      gap: 16px;
+      position: relative;
+      padding-bottom: 24px;
+    }
+    .flow-step:last-child { padding-bottom: 0; }
+    .flow-num {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--blue);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 1;
+    }
+    .flow-step:not(:last-child) .flow-num::after {
+      content: "";
+      position: absolute;
+      top: 32px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 2px;
+      height: calc(100% + 0px);
+      background: var(--border);
+      z-index: 0;
+    }
+    .flow-body { padding-top: 4px; flex: 1; }
+    .flow-body strong { color: var(--blue); display: block; margin-bottom: 4px; }
+    .flow-body ul { padding-left: 18px; color: var(--muted); font-size: 0.88rem; }
+    .flow-body li { margin-bottom: 2px; }
+
+    /* ── Component table ── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+    thead tr { background: var(--surface); }
+    th {
+      text-align: left;
+      padding: 10px 14px;
+      color: var(--muted);
+      font-weight: 600;
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: rgba(255,255,255,.02); }
+    code {
+      background: rgba(110,118,129,.2);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.82rem;
+      color: var(--orange);
+    }
+
+    /* ── Scaling box ── */
+    .scale-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+    }
+    .scale-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px;
+      text-align: center;
+    }
+    .scale-card .num {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--blue);
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+    .scale-card .desc { font-size: 0.78rem; color: var(--muted); }
+
+    /* ── Design decisions ── */
+    .decisions { display: flex; flex-direction: column; gap: 12px; }
+    .decision {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--blue);
+      border-radius: 0 10px 10px 0;
+      padding: 14px 18px;
+    }
+    .decision h4 { font-size: 0.9rem; color: var(--text); margin-bottom: 6px; }
+    .decision p  { font-size: 0.83rem; color: var(--muted); }
+
+    /* ── Interview rubric ── */
+    .rubric-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+    }
+    .rubric-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px;
+    }
+    .rubric-card h4 {
+      font-size: 0.85rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .rubric-card ul { padding-left: 16px; font-size: 0.82rem; color: var(--muted); }
+    .rubric-card li { margin-bottom: 5px; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 0.7rem;
+      font-weight: 700;
+    }
+    .badge.pass   { background: rgba(63,185,80,.15);  color: var(--green); }
+    .badge.senior { background: rgba(88,166,255,.15); color: var(--blue); }
+    .badge.fail   { background: rgba(248,81,73,.15);  color: var(--red); }
+
+    /* ── Code block ── */
+    pre {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+      overflow-x: auto;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.82rem;
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+    .tag.pubsub  { background: rgba(88,166,255,.15); color: var(--blue); }
+    .tag.storage { background: rgba(63,185,80,.15);  color: var(--green); }
+    .tag.cache   { background: rgba(188,140,255,.15);color: var(--purple); }
+    .tag.db      { background: rgba(255,166,87,.15); color: var(--orange); }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <header>
+    <h1>Creator Video Upload Notification</h1>
+    <p>System Design &mdash; Asynchronous fan-out with Google Cloud Pub/Sub &bull; 100M+ users</p>
+  </header>
+
+  <!-- Architecture Diagram -->
+  <h2>Architecture</h2>
+  <div class="diagram-grid">
+
+    <!-- Write Path -->
+    <div class="layer">
+      <span class="layer-label write">Write Path &mdash; 1 event per upload</span>
+      <div class="row">
+        <div class="node blue">
+          <span class="icon">🎬</span>
+          <span class="label">Creator</span>
+        </div>
+        <span class="arrow">→</span>
+        <div class="node blue">
+          <span class="icon">☁️</span>
+          <span class="label">Video Upload Service</span>
+          <span class="sub">Cloud Run</span>
+        </div>
+        <span class="arrow">→</span>
+        <div class="node cyan">
+          <span class="icon">📦</span>
+          <span class="label">Cloud Storage</span>
+          <span class="sub">+ Metadata DB</span>
+        </div>
+        <span class="arrow">→</span>
+        <div class="node blue">
+          <span class="icon">📨</span>
+          <span class="label">video-uploaded</span>
+          <span class="sub">Pub/Sub Topic</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="layer-arrow">↓</div>
+
+    <!-- Fan-out -->
+    <div class="layer">
+      <span class="layer-label fanout">Fan-out Layer &mdash; 1 event → N batches</span>
+      <div class="row">
+        <div class="node orange">
+          <span class="icon">⚙️</span>
+          <span class="label">Fan-out Worker</span>
+          <span class="sub">Cloud Run Job</span>
+        </div>
+        <span class="arrow">←</span>
+        <div class="node orange">
+          <span class="icon">🗃️</span>
+          <span class="label">Follower DB</span>
+          <span class="sub">Cassandra / Bigtable</span>
+        </div>
+        <span class="arrow" style="margin-left:auto">→</span>
+        <div class="node yellow">
+          <span class="icon">📨</span>
+          <span class="label">notification-batch</span>
+          <span class="sub">Pub/Sub Topic</span>
+        </div>
+      </div>
+      <p style="text-align:center;font-size:0.78rem;color:var(--muted);margin-top:16px;">
+        100M followers &divide; 500 per batch &nbsp;=&nbsp; <strong style="color:var(--yellow)">200,000 batch messages</strong> published per video upload
+      </p>
+    </div>
+
+    <div class="layer-arrow">↓</div>
+
+    <!-- Notification Delivery -->
+    <div class="layer">
+      <span class="layer-label notif">Notification Delivery &mdash; horizontally scaled</span>
+      <div class="row" style="margin-bottom:20px">
+        <div class="node green">
+          <span class="icon">🤖</span>
+          <span class="label">Notif Worker 1</span>
+        </div>
+        <div class="node green">
+          <span class="icon">🤖</span>
+          <span class="label">Notif Worker 2</span>
+        </div>
+        <div class="node green">
+          <span class="icon">🤖</span>
+          <span class="label">Notif Worker 3</span>
+        </div>
+        <div class="node" style="border-style:dashed">
+          <span class="icon">⋯</span>
+          <span class="label">N replicas</span>
+          <span class="sub">auto-scale</span>
+        </div>
+      </div>
+      <div class="row">
+        <div class="node purple">
+          <span class="icon">📱</span>
+          <span class="label">FCM / APNs</span>
+          <span class="sub">Push</span>
+        </div>
+        <div class="node purple">
+          <span class="icon">📧</span>
+          <span class="label">Email</span>
+          <span class="sub">SES / SendGrid</span>
+        </div>
+        <div class="node purple">
+          <span class="icon">🔔</span>
+          <span class="label">In-App Inbox</span>
+          <span class="sub">Cassandra</span>
+        </div>
+        <div class="node red">
+          <span class="icon">💀</span>
+          <span class="label">Dead Letter</span>
+          <span class="sub">after 5 retries</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Component Table -->
+  <h2>Components</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Component</th>
+        <th>Technology</th>
+        <th>Role</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Video Upload Service</td>
+        <td>Cloud Run <span class="tag pubsub">stateless</span></td>
+        <td>Accepts upload, stores file, publishes 1 event</td>
+      </tr>
+      <tr>
+        <td><code>video-uploaded</code> topic</td>
+        <td>Pub/Sub <span class="tag pubsub">async</span></td>
+        <td>Decouples upload from fan-out — upload stays fast</td>
+      </tr>
+      <tr>
+        <td>Fan-out Worker</td>
+        <td>Cloud Run Job <span class="tag pubsub">async</span></td>
+        <td>Pages through followers, publishes batches</td>
+      </tr>
+      <tr>
+        <td>Follower DB</td>
+        <td>Cassandra / Bigtable <span class="tag db">db</span></td>
+        <td><code>PRIMARY KEY (creator_id, follower_id)</code> — paginated reads</td>
+      </tr>
+      <tr>
+        <td><code>notification-batch</code> topic</td>
+        <td>Pub/Sub <span class="tag pubsub">async</span></td>
+        <td>Load-balances 200K messages across N workers</td>
+      </tr>
+      <tr>
+        <td>Notification Workers</td>
+        <td>Cloud Run <span class="tag pubsub">stateless</span></td>
+        <td>Dispatch push / email / in-app per batch of 500 users</td>
+      </tr>
+      <tr>
+        <td>Preference Cache</td>
+        <td>Redis / Memorystore <span class="tag cache">cache</span></td>
+        <td>Filter opted-out users before calling FCM</td>
+      </tr>
+      <tr>
+        <td>Dead Letter Topic</td>
+        <td>Pub/Sub <span class="tag pubsub">async</span></td>
+        <td>Catches messages after 5 failed retries → alert</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Message Flow -->
+  <h2>Message Flow</h2>
+  <div class="flow">
+    <div class="flow-step">
+      <div class="flow-num">1</div>
+      <div class="flow-body">
+        <strong>Creator uploads video</strong>
+        <ul>
+          <li>Video Upload Service stores file to Cloud Storage</li>
+          <li>Publishes <code>VideoUploadedEvent { creator_id, video_id, title }</code> — 1 message total</li>
+        </ul>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">2</div>
+      <div class="flow-body">
+        <strong>Fan-out Worker receives event</strong>
+        <ul>
+          <li>Pages through Follower DB in chunks of 500 — never loads all into RAM</li>
+          <li>For each page, publishes <code>NotificationBatch { user_ids[500], video_id, title }</code></li>
+          <li>ACKs original event only after all batches are published</li>
+        </ul>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">3</div>
+      <div class="flow-body">
+        <strong>Pub/Sub load-balances batches across workers</strong>
+        <ul>
+          <li>Each batch message delivered to exactly ONE available Notification Worker</li>
+          <li>Competing consumers — add more replicas = linear throughput increase</li>
+        </ul>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">4</div>
+      <div class="flow-body">
+        <strong>Notification Worker processes batch</strong>
+        <ul>
+          <li>Checks Redis: filter opted-out users</li>
+          <li>Calls FCM / APNs for push notifications</li>
+          <li>Writes to Cassandra in-app inbox</li>
+          <li>ACKs on success / NACKs on failure (retried with exponential backoff)</li>
+        </ul>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-num">5</div>
+      <div class="flow-body">
+        <strong>Failure path</strong>
+        <ul>
+          <li>After 5 failed delivery attempts → message moved to Dead Letter Topic</li>
+          <li>Alert fires → on-call team investigates</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scaling Numbers -->
+  <h2>Scaling Numbers</h2>
+  <div class="scale-grid">
+    <div class="scale-card">
+      <div class="num">100M</div>
+      <div class="desc">followers of a large creator</div>
+    </div>
+    <div class="scale-card">
+      <div class="num">500</div>
+      <div class="desc">users per Pub/Sub batch message</div>
+    </div>
+    <div class="scale-card">
+      <div class="num">200K</div>
+      <div class="desc">batch messages enqueued per upload</div>
+    </div>
+    <div class="scale-card">
+      <div class="num">500</div>
+      <div class="desc">Notification Worker replicas (auto-scale)</div>
+    </div>
+    <div class="scale-card">
+      <div class="num">~3 min</div>
+      <div class="desc">end-to-end latency to notify 100M users</div>
+    </div>
+    <div class="scale-card">
+      <div class="num">1 msg</div>
+      <div class="desc">published by the upload service — always</div>
+    </div>
+  </div>
+
+  <!-- Key Design Decisions -->
+  <h2>Key Design Decisions</h2>
+  <div class="decisions">
+    <div class="decision">
+      <h4>1. Two-tier fan-out — not one giant loop</h4>
+      <p>Upload service publishes <strong>1 message</strong>, keeping the upload path fast and simple. Fan-out worker handles the N-to-M explosion entirely asynchronously.</p>
+    </div>
+    <div class="decision">
+      <h4>2. Batching (500 users / message)</h4>
+      <p>Avoids publishing 100M individual Pub/Sub messages (cost + quota). Each batch is independently retry-able, so a single failure doesn't replay all 100M sends.</p>
+    </div>
+    <div class="decision">
+      <h4>3. Competing consumers on <code>notification-batch</code></h4>
+      <p>Pub/Sub delivers each message to exactly one subscriber. Adding more worker replicas scales throughput linearly with zero coordination logic.</p>
+    </div>
+    <div class="decision">
+      <h4>4. Dead Letter Topic</h4>
+      <p>After 5 failed delivery attempts with exponential backoff, the message moves to a dead-letter topic. Prevents a "poison pill" message from blocking the entire queue.</p>
+    </div>
+    <div class="decision">
+      <h4>5. Follower DB schema — Cassandra</h4>
+      <p><code>PRIMARY KEY (creator_id, follower_id)</code> enables efficient paginated range scans. Fan-out worker streams pages — never holds 100M IDs in RAM simultaneously.</p>
+    </div>
+    <div class="decision">
+      <h4>6. User preference filter in Redis</h4>
+      <p>Checked inside Notification Worker before calling FCM. Saves FCM quota, respects opt-outs, and keeps the filter logic close to delivery — not in the fan-out path.</p>
+    </div>
+  </div>
+
+  <!-- Interview Rubric -->
+  <h2>Interview Rubric</h2>
+  <div class="rubric-grid">
+    <div class="rubric-card">
+      <h4><span class="badge pass">PASS</span> Must-haves</h4>
+      <ul>
+        <li>Decouples upload from notification (async)</li>
+        <li>Identifies fan-out problem for large creators</li>
+        <li>Mentions batching or pagination of followers</li>
+        <li>Chooses appropriate data store for followers</li>
+      </ul>
+    </div>
+    <div class="rubric-card">
+      <h4><span class="badge senior">SENIOR</span> Strong signals</h4>
+      <ul>
+        <li>Two-tier fan-out design explicitly articulated</li>
+        <li>Dead Letter Topic for failure handling</li>
+        <li>Cassandra schema for paginated follower reads</li>
+        <li>Computes actual scaling numbers (100M ÷ 500)</li>
+        <li>User preference filter before FCM call</li>
+        <li>ACK strategy — only after all batches published</li>
+      </ul>
+    </div>
+    <div class="rubric-card">
+      <h4><span class="badge fail">FAIL</span> Red flags</h4>
+      <ul>
+        <li>Notifies 100M users synchronously inside the upload request</li>
+        <li>No retry or failure strategy</li>
+        <li>No batching — publishes 100M individual messages</li>
+        <li>Loads all follower IDs into memory at once</li>
+        <li>No mention of fan-out bottleneck</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Run Locally -->
+  <h2>Run Locally</h2>
+  <pre><code># 1. Start Pub/Sub emulator
+docker compose up -d
+
+# 2. Install dependencies
+pip install -r requirements.txt
+
+# 3. Run the full demo
+python main.py</code></pre>
+
+  <pre><code>=== Setting up Pub/Sub ===
+  [+] topic created: video-uploaded
+  [+] topic created: notification-batch
+  [+] subscription created: fanout-worker-sub
+  ...
+
+[Main] Seeded 10,000 followers for creator_A
+
+[VideoUploadService] Published event → creator=creator_A video=vid_001
+[FanoutWorker] creator=creator_A followers=10,000 → fanning out...
+[FanoutWorker] Done — published 20 batches (10,000 notifications enqueued)
+[notif-worker-1] Sent 500 notifications for video='My Awesome New Video'
+[notif-worker-2] Sent 500 notifications for video='My Awesome New Video'
+...
+
+==================================================
+  Total notifications delivered: 10,000 / 10,000
+==================================================</code></pre>
+
+</div>
+</body>
+</html>
