@@ -1,0 +1,12 @@
+{
+  "name": "banner",
+  "version": "1.0.0",
+  "description": "Terminal banner generator with pixel-art agents",
+  "type": "module",
+  "scripts": {
+    "agents": "node agents.js"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0"
+  }
+}

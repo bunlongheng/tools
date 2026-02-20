@@ -25,6 +25,7 @@ I'm **Bunlong Heng**, a Full-Stack Developer specialising in web development, so
 |------|-------------|------|------|
 | [✍️ MD Viewer](https://bunlongheng.github.io/tools/md/) | Minimal split-pane markdown editor with live preview and dark/light theme | Web | [docs](./docs/md.md) |
 | [🎙️ Meeting Processor](https://bunlongheng.github.io/tools/meeting-processor/) | Drop a video → AI meeting notes via ffmpeg + Whisper + Claude | Local (macOS) | [docs](./docs/meeting-processor.md) |
+| [🤖 Banner](./banner/) | Terminal banner generator with 12 pixel-art agents (BLAZE, VENUS, ZAP…) — reusable across any Node script | Local (Node) | [docs](./docs/banner.md) |
 
 ---
 
