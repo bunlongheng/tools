@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,7 +11,7 @@
 
   <!-- highlight.js theme (swapped by JS on theme toggle) -->
   <link id="hljs-theme" rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
 
   <!-- marked + highlight.js -->
   <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
@@ -576,7 +576,7 @@ btnTheme.addEventListener('click', () => applyTheme(!dark));
 
 // Restore preference
 const savedTheme = localStorage.getItem('md-theme');
-applyTheme(savedTheme ? savedTheme === 'dark' : true);
+applyTheme(savedTheme ? savedTheme === 'dark' : false);
 
 /* ════════════════════════════════════════════════════════════
    LOAD FILE (local)
