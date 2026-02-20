@@ -34,6 +34,7 @@ These are live tools hosted on my personal site. Click any to try them.
 
 | Tool | What it does |
 |------|-------------|
+| [📱 Device Frames](https://www.bunlongheng.com/tools/device-frames) | Preview any URL inside phone, tablet & desktop frames — device specs, hover sounds, and confetti |
 | [Distances](https://www.bunlongheng.com/tools/distances) | Calculate and visualise distances |
 | [God Eyes](https://www.bunlongheng.com/tools/god-eyes) | Visual monitoring tool |
 | [Hawaii](https://www.bunlongheng.com/tools/hawaii) | Hawaii-inspired colour palettes |
