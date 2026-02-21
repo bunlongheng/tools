@@ -109,23 +109,6 @@
     #fit-btn:hover { background: rgba(0,0,0,0.05); }
     #fit-btn.active { color: #3b82f6; background: rgba(59,130,246,0.08); }
 
-    /* Minimap */
-    #minimap {
-      position: absolute; top: 12px; right: 12px;
-      background: white; border: 1px solid #e2e8f0; border-radius: 8px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.15);
-      overflow: hidden; z-index: 10; cursor: crosshair;
-    }
-    #minimap-viewport {
-      position: absolute; border: 2px solid #3b82f6;
-      background: rgba(59,130,246,0.12); border-radius: 3px; pointer-events: none;
-    }
-    #minimap-label {
-      position: absolute; bottom: 4px; right: 6px;
-      font-size: 8px; font-weight: 700; color: #94a3b8;
-      letter-spacing: 0.08em; text-transform: uppercase; pointer-events: none;
-    }
-
     /* Settings panel */
     #settings-panel {
       width: 268px; flex-shrink: 0; display: flex; flex-direction: column;
@@ -250,9 +233,6 @@
         <button id="fit-btn" class="active">Fit</button>
       </div>
 
-      <!-- Minimap -->
-      <div id="minimap">
-        <div id="minimap-svg-wrap"></div>
         <div id="minimap-viewport"></div>
         <div id="minimap-label">minimap</div>
       </div>
@@ -508,9 +488,6 @@ const svgContainer   = document.getElementById("svg-container");
 const emptyMsg       = document.getElementById("empty-msg");
 const zoomPctEl      = document.getElementById("zoom-pct");
 const fitBtn         = document.getElementById("fit-btn");
-const minimapEl      = document.getElementById("minimap");
-const minimapSvgWrap = document.getElementById("minimap-svg-wrap");
-const minimapVp      = document.getElementById("minimap-viewport");
 const codePanel      = document.getElementById("code-panel");
 const codeInner      = document.getElementById("code-inner");
 const codeEditor     = document.getElementById("code-editor");
@@ -526,12 +503,10 @@ function render() {
   if (!currentSvg) {
     svgContainer.style.display = "none";
     emptyMsg.style.display = "flex";
-    minimapEl.style.display = "none";
-    return;
+      return;
   }
   svgContainer.style.display = "flex";
   emptyMsg.style.display = "none";
-  minimapEl.style.display = "block";
   const m = currentSvg.match(/width="(\d+)" height="(\d+)"/);
   if (m) { svgW = parseInt(m[1]); svgH = parseInt(m[2]); }
   updateDisplay();
@@ -546,32 +521,8 @@ function updateDisplay() {
     btn.classList.toggle("active", !fitActive && parseInt(btn.dataset.pct) === Math.round(zoom * 100));
   });
   fitBtn.classList.toggle("active", fitActive);
-  updateMinimap();
 }
 
-// ── Minimap ───────────────────────────────────────────────────────────────────
-function updateMinimap() {
-  if (!currentSvg || !svgW) return;
-  const mmScale = Math.min(260 / svgW, 180 / svgH);
-  const mmW = Math.round(svgW * mmScale), mmH = Math.round(svgH * mmScale);
-  minimapEl.style.width  = mmW + "px";
-  minimapEl.style.height = mmH + "px";
-  minimapSvgWrap.innerHTML = currentSvg.replace(/width="\d+" height="\d+"/, `width="${mmW}" height="${mmH}"`);
-  const svgEl = svgWrap.querySelector("svg");
-  const canvasRect = canvasEl.getBoundingClientRect();
-  const svgLeft = svgEl ? svgEl.getBoundingClientRect().left - canvasRect.left + canvasEl.scrollLeft : 0;
-  const svgTop  = svgEl ? svgEl.getBoundingClientRect().top  - canvasRect.top  + canvasEl.scrollTop  : 0;
-  const vl = Math.max(0, (canvasEl.scrollLeft - svgLeft) / zoom);
-  const vt = Math.max(0, (canvasEl.scrollTop  - svgTop)  / zoom);
-  const vr = Math.min(svgW, (canvasEl.scrollLeft + canvasEl.clientWidth  - svgLeft) / zoom);
-  const vb = Math.min(svgH, (canvasEl.scrollTop  + canvasEl.clientHeight - svgTop)  / zoom);
-  const rx = Math.max(0, vl * mmScale);
-  const ry = Math.max(0, vt * mmScale);
-  minimapVp.style.left   = rx + "px";
-  minimapVp.style.top    = ry + "px";
-  minimapVp.style.width  = Math.max(8, Math.min(mmW - rx, (vr - vl) * mmScale)) + "px";
-  minimapVp.style.height = Math.max(8, Math.min(mmH - ry, (vb - vt) * mmScale)) + "px";
-}
 
 // ── Fit ───────────────────────────────────────────────────────────────────────
 function fitZoom() {
@@ -601,7 +552,6 @@ window.addEventListener("mousemove", e => {
 window.addEventListener("mouseup", () => {
   if (isDragging) { isDragging = false; canvasEl.classList.remove("dragging"); }
 });
-canvasEl.addEventListener("scroll", updateMinimap);
 
 // ── Zoom controls ─────────────────────────────────────────────────────────────
 canvasEl.addEventListener("wheel", e => {
@@ -619,19 +569,6 @@ document.querySelectorAll(".zoom-preset").forEach(btn => {
 });
 fitBtn.addEventListener("click", fitZoom);
 
-// ── Minimap click-to-navigate ─────────────────────────────────────────────────
-minimapEl.addEventListener("click", e => {
-  if (!svgW) return;
-  const rect = minimapEl.getBoundingClientRect();
-  const svgX = ((e.clientX - rect.left) / minimapEl.offsetWidth)  * svgW;
-  const svgY = ((e.clientY - rect.top)  / minimapEl.offsetHeight) * svgH;
-  const svgEl = svgWrap.querySelector("svg");
-  const canvasRect = canvasEl.getBoundingClientRect();
-  const svgLeft = svgEl ? svgEl.getBoundingClientRect().left - canvasRect.left + canvasEl.scrollLeft : 0;
-  const svgTop  = svgEl ? svgEl.getBoundingClientRect().top  - canvasRect.top  + canvasEl.scrollTop  : 0;
-  canvasEl.scrollLeft = svgLeft + svgX * zoom - canvasEl.clientWidth  / 2;
-  canvasEl.scrollTop  = svgTop  + svgY * zoom - canvasEl.clientHeight / 2;
-});
 
 // ── Code editor ───────────────────────────────────────────────────────────────
 codeEditor.value = code;
