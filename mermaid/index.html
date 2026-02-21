@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mermaid++ — Sequence Diagram Generator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; font-family: 'Inter', sans-serif; }
+    #app { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* Header */
+    #header {
+      height: 54px; background: #111113; border-bottom: 1px solid #27272a;
+      display: flex; align-items: center; padding: 0 20px; flex-shrink: 0;
+    }
+    #header-title { font-size: 16px; font-weight: 700; color: #f4f4f5; letter-spacing: -0.3px; }
+    #header-actions { margin-left: auto; display: flex; gap: 8px; }
+    .icon-btn {
+      width: 40px; height: 40px; border-radius: 50%; border: none;
+      background: #2a2a2c; color: white; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: filter 0.2s; font-size: 16px;
+    }
+    .icon-btn:hover { filter: brightness(1.25); }
+    .icon-btn.active { background: #0a84ff; }
+
+    /* Body */
+    #body { flex: 1; display: flex; overflow: hidden; }
+
+    /* Code panel */
+    #code-panel { display: flex; flex-shrink: 0; position: relative; }
+    #code-inner {
+      flex: 1; display: flex; flex-direction: column; overflow: hidden;
+      border-right: 1px solid #e2e8f0; background: #ffffff;
+    }
+    #code-inner.dark { background: #0d1117; border-color: #1e2334; }
+    #code-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 16px; border-bottom: 1px solid #e2e8f0;
+      background: #f8fafc; flex-shrink: 0;
+    }
+    #code-inner.dark #code-header { border-color: #1e2334; background: #0a0f1e; }
+    #code-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #94a3b8; }
+    #code-actions { display: flex; align-items: center; gap: 4px; }
+    #copy-btn {
+      height: 24px; padding: 0 8px; border: none; border-radius: 4px;
+      font-size: 10px; font-weight: 600; cursor: pointer;
+      background: transparent; color: #94a3b8; transition: all 0.2s;
+    }
+    #copy-btn.copied { color: #22c55e; background: rgba(34,197,94,0.08); }
+    #theme-btn { width: 24px; height: 24px; border: none; background: transparent; cursor: pointer; font-size: 14px; }
+    #code-editor {
+      flex: 1; resize: none; outline: none; border: none; padding: 16px;
+      background: transparent; color: #1e293b;
+      font-family: 'JetBrains Mono', monospace; font-size: 12.5px; line-height: 1.75;
+    }
+    #code-inner.dark #code-editor { color: #8892a4; }
+    #drag-handle {
+      position: absolute; right: 0; top: 0; bottom: 0; width: 8px;
+      cursor: col-resize; display: flex; align-items: center; justify-content: center; z-index: 10;
+    }
+    #drag-handle-bar { width: 4px; height: 48px; border-radius: 2px; background: #e2e8f0; }
+
+    /* Canvas */
+    #canvas-area { flex: 1; position: relative; background: #c8d0da; overflow: hidden; }
+    #canvas { position: absolute; inset: 0; overflow: auto; cursor: grab; }
+    #canvas.dragging { cursor: grabbing; }
+    #svg-container {
+      min-width: 100%; min-height: 100%;
+      display: flex; justify-content: center; align-items: flex-start;
+      padding: 24px; box-sizing: border-box;
+    }
+    #svg-wrap { flex-shrink: 0; }
+    #empty-msg {
+      display: flex; align-items: center; justify-content: center;
+      height: 100%; color: #94a3b8; font-size: 14px;
+    }
+
+    /* Zoom toolbar */
+    #zoom-toolbar {
+      position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+      background: white; border: 1px solid #e2e8f0; border-radius: 10px;
+      padding: 3px 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+      display: flex; align-items: center; gap: 2px; z-index: 10;
+    }
+    .zoom-btn {
+      width: 24px; height: 24px; border: none; background: transparent;
+      border-radius: 4px; cursor: pointer; color: #64748b; font-size: 18px; line-height: 1;
+      display: flex; align-items: center; justify-content: center; transition: background 0.2s;
+    }
+    .zoom-btn:hover { background: rgba(0,0,0,0.05); }
+    #zoom-pct { color: #1e293b; font-size: 11px; font-weight: 600; min-width: 38px; text-align: center; }
+    .zoom-sep { width: 1px; height: 14px; background: #e2e8f0; margin: 0 6px; }
+    .zoom-preset {
+      border: none; background: transparent; border-radius: 4px;
+      padding: 2px 6px; font-size: 10px; font-weight: 600;
+      cursor: pointer; color: #64748b; transition: all 0.2s;
+    }
+    .zoom-preset:hover { background: rgba(0,0,0,0.05); }
+    .zoom-preset.active { color: #3b82f6; background: rgba(59,130,246,0.08); }
+    #fit-btn {
+      border: none; background: transparent; border-radius: 4px;
+      padding: 2px 8px; font-size: 10px; font-weight: 700;
+      cursor: pointer; color: #64748b; letter-spacing: 0.04em; transition: all 0.2s;
+    }
+    #fit-btn:hover { background: rgba(0,0,0,0.05); }
+    #fit-btn.active { color: #3b82f6; background: rgba(59,130,246,0.08); }
+
+    /* Minimap */
+    #minimap {
+      position: absolute; top: 12px; right: 12px;
+      background: white; border: 1px solid #e2e8f0; border-radius: 8px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+      overflow: hidden; z-index: 10; cursor: crosshair;
+    }
+    #minimap-viewport {
+      position: absolute; border: 2px solid #3b82f6;
+      background: rgba(59,130,246,0.12); border-radius: 3px; pointer-events: none;
+    }
+    #minimap-label {
+      position: absolute; bottom: 4px; right: 6px;
+      font-size: 8px; font-weight: 700; color: #94a3b8;
+      letter-spacing: 0.08em; text-transform: uppercase; pointer-events: none;
+    }
+
+    /* Settings panel */
+    #settings-panel {
+      width: 268px; flex-shrink: 0; display: flex; flex-direction: column;
+      background: #161618; border-left: 1px solid #2a2a2a;
+    }
+    #settings-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 16px; height: 54px; border-bottom: 1px solid #2a2a2a; flex-shrink: 0;
+    }
+    #settings-title { font-size: 14px; font-weight: 600; color: #fff; letter-spacing: -0.2px; }
+    #settings-close {
+      width: 28px; height: 28px; border: none; background: transparent;
+      border-radius: 8px; color: #555; cursor: pointer; font-size: 16px;
+      display: flex; align-items: center; justify-content: center; transition: background 0.2s;
+    }
+    #settings-close:hover { background: rgba(255,255,255,0.1); }
+    #settings-body {
+      flex: 1; overflow-y: auto; padding: 20px 16px;
+      display: flex; flex-direction: column; gap: 20px;
+    }
+    .sec-title {
+      font-size: 10px; font-weight: 700; color: #444;
+      text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px;
+    }
+    .toggle-row {
+      display: flex; align-items: center; justify-content: space-between;
+      cursor: pointer; user-select: none;
+    }
+    .toggle-label { font-size: 13px; color: #bbb; font-weight: 400; }
+    .toggle-switch {
+      position: relative; width: 42px; height: 24px; border-radius: 12px;
+      background: #333; transition: background 0.2s; cursor: pointer; flex-shrink: 0;
+    }
+    .toggle-switch.on { background: #34c759; }
+    .toggle-knob {
+      position: absolute; top: 2px; width: 20px; height: 20px;
+      border-radius: 10px; background: white; left: 2px;
+      transition: left 0.2s ease; box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+    }
+    .toggle-switch.on .toggle-knob { left: 20px; }
+    .settings-sep { height: 1px; background: #222; }
+    .slider-header { display: flex; justify-content: space-between; margin-bottom: 4px; }
+    .slider-label { font-size: 12px; color: #ffffff; font-weight: 400; }
+    .slider-value { font-size: 12px; color: #636366; font-weight: 400; }
+    input[type=range] { width: 100%; accent-color: #0a84ff; }
+    .lifeline-select {
+      width: 100%; padding: 6px 10px; border-radius: 8px;
+      border: 1px solid #333; background: #222; color: #bbb; font-size: 12px;
+      cursor: pointer; outline: none;
+    }
+    .export-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+    .export-btn {
+      padding: 10px; border: none; border-radius: 12px;
+      font-size: 12px; font-weight: 600; cursor: pointer; color: white;
+      transition: filter 0.2s, transform 0.1s;
+    }
+    .export-btn:hover { filter: brightness(1.1); }
+    .export-btn:active { transform: scale(0.95); }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HEADER -->
+  <header id="header">
+    <span id="header-title">Mermaid++</span>
+    <div id="header-actions">
+      <button class="icon-btn" id="code-toggle-btn" title="Toggle code editor">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+        </svg>
+      </button>
+      <button class="icon-btn" id="settings-toggle-btn" title="Toggle settings">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
+          <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
+          <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
+          <line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/>
+          <line x1="17" y1="16" x2="23" y2="16"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- BODY -->
+  <div id="body">
+
+    <!-- Code Panel -->
+    <div id="code-panel" style="display:none; width:340px;">
+      <div id="code-inner">
+        <div id="code-header">
+          <span id="code-label">Code</span>
+          <div id="code-actions">
+            <button id="copy-btn">Copy</button>
+            <button id="theme-btn">🌙</button>
+          </div>
+        </div>
+        <textarea id="code-editor" spellcheck="false"></textarea>
+      </div>
+      <div id="drag-handle"><div id="drag-handle-bar"></div></div>
+    </div>
+
+    <!-- Canvas Area -->
+    <div id="canvas-area">
+      <div id="canvas">
+        <div id="svg-container"><div id="svg-wrap"></div></div>
+        <div id="empty-msg" style="display:none;">No diagram — open the code editor and enter sequence syntax.</div>
+      </div>
+
+      <!-- Zoom toolbar -->
+      <div id="zoom-toolbar">
+        <button class="zoom-btn" id="zoom-out">−</button>
+        <span id="zoom-pct">100%</span>
+        <button class="zoom-btn" id="zoom-in">+</button>
+        <div class="zoom-sep"></div>
+        <button class="zoom-preset" data-pct="50">50%</button>
+        <button class="zoom-preset" data-pct="75">75%</button>
+        <button class="zoom-preset" data-pct="100">100%</button>
+        <button class="zoom-preset" data-pct="120">120%</button>
+        <button class="zoom-preset" data-pct="150">150%</button>
+        <div class="zoom-sep"></div>
+        <button id="fit-btn" class="active">Fit</button>
+      </div>
+
+      <!-- Minimap -->
+      <div id="minimap">
+        <div id="minimap-svg-wrap"></div>
+        <div id="minimap-viewport"></div>
+        <div id="minimap-label">minimap</div>
+      </div>
+    </div>
+
+    <!-- Settings Panel -->
+    <div id="settings-panel" style="display:none;">
+      <div id="settings-header">
+        <span id="settings-title">Settings</span>
+        <button id="settings-close">✕</button>
+      </div>
+      <div id="settings-body">
+
+        <div>
+          <div class="sec-title">Style</div>
+          <div style="display:flex;flex-direction:column;gap:11px;">
+            <div class="toggle-row" data-opt="coloredLines">
+              <span class="toggle-label">Lines</span>
+              <div class="toggle-switch on"><div class="toggle-knob"></div></div>
+            </div>
+            <div class="toggle-row" data-opt="coloredNumbers">
+              <span class="toggle-label">Numbers</span>
+              <div class="toggle-switch on"><div class="toggle-knob"></div></div>
+            </div>
+            <div class="toggle-row" data-opt="coloredText">
+              <span class="toggle-label">Text Pill</span>
+              <div class="toggle-switch on"><div class="toggle-knob"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-sep"></div>
+
+        <div>
+          <div class="sec-title">Lifeline Style</div>
+          <select class="lifeline-select" id="lifeline-select">
+            <option value="circle">Circle (round)</option>
+            <option value="dot">Dot</option>
+            <option value="small">Small dash</option>
+            <option value="long">Long dash</option>
+          </select>
+        </div>
+
+        <div class="settings-sep"></div>
+
+        <div>
+          <div class="sec-title">Layout</div>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <div><div class="slider-header"><span class="slider-label">Height</span><span class="slider-value" id="val-stepHeight">42</span></div><input type="range" min="30" max="80" value="42" id="sl-stepHeight"></div>
+            <div><div class="slider-header"><span class="slider-label">Width</span><span class="slider-value" id="val-boxWidth">141</span></div><input type="range" min="80" max="180" value="141" id="sl-boxWidth"></div>
+            <div><div class="slider-header"><span class="slider-label">Gap</span><span class="slider-value" id="val-spacing">250</span></div><input type="range" min="120" max="350" value="250" id="sl-spacing"></div>
+            <div><div class="slider-header"><span class="slider-label">Font</span><span class="slider-value" id="val-textSize">13px</span></div><input type="range" min="10" max="20" value="13" id="sl-textSize"></div>
+            <div><div class="slider-header"><span class="slider-label">Margin</span><span class="slider-value" id="val-margin">50</span></div><input type="range" min="35" max="120" value="50" id="sl-margin"></div>
+          </div>
+        </div>
+
+        <div class="settings-sep"></div>
+
+        <div>
+          <div class="sec-title">Export</div>
+          <div class="export-grid">
+            <button class="export-btn" id="export-png" style="background:#f97316;">PNG</button>
+            <button class="export-btn" id="export-code" style="background:#3b82f6;">Code</button>
+            <button class="export-btn" id="export-json" style="background:#22c55e;">JSON</button>
+            <button class="export-btn" id="export-copy" style="background:#8b5cf6;">Copy</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── Palette ───────────────────────────────────────────────────────────────────
+const PAL = ["#ef4444","#f97316","#eab308","#22c55e","#14b8a6","#06b6d4","#3b82f6","#8b5cf6","#ec4899","#f43f5e","#84cc16","#0891b2"];
+
+// ── Parser ────────────────────────────────────────────────────────────────────
+function parse(code) {
+  const participants = [], map = new Map(), messages = [];
+  let step = 0, ci = 0, title;
+  function addP(id, label) {
+    if (!map.has(id)) {
+      const p = { id, color: PAL[ci++ % PAL.length], label: (label ?? id).replace(/\[(.+?)\]/g, "($1)") };
+      participants.push(p); map.set(id, p);
+    }
+  }
+  for (const raw of code.split("\n")) {
+    const l = raw.trim();
+    if (!l || /^(%%|sequenceDiagram|autonumber|---|```)/.test(l)) continue;
+    const tm = l.match(/^title:\s*(.+)$/i);
+    if (tm) { title = tm[1].trim(); continue; }
+    const pm = l.match(/^participant\s+(\S+)(?:\s+as\s+(.+))?$/i);
+    if (pm) { addP(pm[1], pm[2]); continue; }
+    const mm = l.match(/^(\w+)\s*(-->>|->>|-->|->)\s*(\w+):\s*(.*)$/);
+    if (mm) {
+      const [, fId, arr, tId, rawText] = mm;
+      addP(fId); addP(tId);
+      const cleaned = rawText.replace(/<br\s*\/?>/gi, " ").trim();
+      const numPfx = cleaned.match(/^(\d+)\.\s+([\s\S]*)$/);
+      messages.push({
+        from: fId, to: tId,
+        text: numPfx ? numPfx[2].trim() : cleaned,
+        arrow: arr.startsWith("--") ? "dashed" : "solid",
+        step: ++step,
+        displayStep: numPfx ? parseInt(numPfx[1]) : undefined,
+      });
+    }
+  }
+  return { participants, messages, title };
+}
+
+// ── SVG Renderer ──────────────────────────────────────────────────────────────
+function esc(s) { return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+const LIFELINE_DASH = {
+  circle: { da: "0 8", cap: "round", sw: 3 },
+  dot:    { da: "2 5" },
+  small:  { da: "7 5" },
+  long:   { da: "14 6" },
+};
+function buildSvg(d, o, l) {
+  const { participants: ps, messages: ms } = d;
+  if (!ps.length) return "";
+  const BW = l.boxWidth, BH = Math.max(28, Math.round(BW * 0.31));
+  const BR = 6, HS = l.spacing, LP = l.margin ?? 50, MG = l.stepHeight;
+  const SR = 10, AH = 8, SW = 50, SH = 36, FS = l.textSize;
+  const diagramTitle = d.title ?? "Sequence Diagram";
+  const TITLE_H = 38, TP = 28, BOT_PAD = TITLE_H + TP;
+  const cx = i => LP + BW / 2 + i * HS;
+  const idx = new Map(ps.map((p, i) => [p.id, i]));
+  const W = 2 * LP + (ps.length - 1) * HS + BW;
+  const VP = 44;
+  const H = TITLE_H + TP + BH + VP + ms.length * MG + VP + BH + BOT_PAD;
+  const lt = TITLE_H + TP + BH, lb = H - BOT_PAD - BH;
+  const msgY = s => TITLE_H + TP + BH + VP + (s - 1) * MG;
+  const f = `'${o.font || "Inter"}', sans-serif`;
+  const ld = LIFELINE_DASH[o.lifelineDash] ?? LIFELINE_DASH.circle;
+  const lifelineSW = ld.sw ?? 1.5;
+  const lifelineCapAttr = ld.cap ? ` stroke-linecap="${ld.cap}"` : "";
+  const parts = [];
+  parts.push(`<rect width="${W}" height="${H}" fill="white"/>`);
+  parts.push(`<text x="${W/2}" y="${TITLE_H/2+6}" text-anchor="middle" dominant-baseline="middle" font-family="${f}" font-size="15" font-weight="700" fill="#1e293b">${esc(diagramTitle)}</text>`);
+  ps.forEach((p, i) => {
+    const c = o.coloredLines ? p.color + "60" : "#d1d5db";
+    parts.push(`<line x1="${cx(i)}" y1="${lt}" x2="${cx(i)}" y2="${lb}" stroke="${c}" stroke-width="${lifelineSW}" stroke-dasharray="${ld.da}"${lifelineCapAttr}/>`);
+  });
+  ps.forEach((p, i) => {
+    const x = cx(i) - BW/2, y = TITLE_H + TP;
+    parts.push(`<rect x="${x}" y="${y}" width="${BW}" height="${BH}" rx="${BR}" fill="${p.color}" stroke="#000000" stroke-width="2"/>`);
+    parts.push(`<text x="${cx(i)}" y="${y+BH/2+1}" text-anchor="middle" dominant-baseline="middle" font-family="${f}" font-size="${FS}" font-weight="700" fill="white">${esc(p.label)}</text>`);
+  });
+  ms.forEach(msg => {
+    const fi = idx.get(msg.from) ?? 0, ti = idx.get(msg.to) ?? 0;
+    const y = msgY(msg.step);
+    const fx = cx(fi), tx = cx(ti);
+    const fp = ps[fi];
+    const lc = o.coloredLines ? fp.color : "#374151";
+    const tc = o.coloredText ? fp.color : "#1e293b";
+    const circleFill = o.coloredNumbers ? fp.color : "#1c1c1c";
+    const circleText = o.coloredNumbers ? "#000000" : "white";
+    if (fi === ti) {
+      parts.push(`<path d="M${fx} ${y} H${fx+SW} V${y+SH} H${fx}" fill="none" stroke="${lc}" stroke-width="1.5"/>`);
+      parts.push(`<polygon points="${fx},${y+SH} ${fx+AH},${y+SH-5} ${fx+AH},${y+SH+5}" fill="${lc}"/>`);
+      if (o.coloredText) {
+        const pillH = FS+8, pillW = Math.max(40, msg.text.length*(FS*0.62)+12);
+        const pillX = fx+SW+5, pillY = y+SH/2-pillH/2;
+        parts.push(`<rect x="${pillX}" y="${pillY}" width="${pillW}" height="${pillH}" rx="${pillH/2}" fill="${fp.color}"/>`);
+        parts.push(`<text x="${pillX+pillW/2}" y="${pillY+pillH/2+1}" text-anchor="middle" dominant-baseline="middle" font-family="${f}" font-size="${FS}" font-weight="600" fill="#000000">${esc(msg.text)}</text>`);
+      } else {
+        parts.push(`<text x="${fx+SW+5}" y="${y+SH/2+1}" dominant-baseline="middle" font-family="${f}" font-size="${FS}" fill="${tc}">${esc(msg.text)}</text>`);
+      }
+    } else {
+      const dir = tx > fx ? 1 : -1;
+      parts.push(`<line x1="${fx}" y1="${y}" x2="${tx-dir*AH}" y2="${y}" stroke="${lc}" stroke-width="1.5"/>`);
+      if (dir===1) parts.push(`<polygon points="${tx},${y} ${tx-AH},${y-5} ${tx-AH},${y+5}" fill="${lc}"/>`);
+      else         parts.push(`<polygon points="${tx},${y} ${tx+AH},${y-5} ${tx+AH},${y+5}" fill="${lc}"/>`);
+      const mid = (fx+tx)/2;
+      if (o.coloredText) {
+        const pillH = FS+8, pillW = Math.max(40, msg.text.length*(FS*0.62)+12);
+        const pillY = y-pillH-10;
+        parts.push(`<rect x="${mid-pillW/2}" y="${pillY}" width="${pillW}" height="${pillH}" rx="${pillH/2}" fill="${fp.color}"/>`);
+        parts.push(`<text x="${mid}" y="${pillY+pillH/2+1}" text-anchor="middle" dominant-baseline="middle" font-family="${f}" font-size="${FS}" font-weight="600" fill="#000000">${esc(msg.text)}</text>`);
+      } else {
+        parts.push(`<text x="${mid}" y="${y-8}" text-anchor="middle" font-family="${f}" font-size="${FS}" fill="${tc}">${esc(msg.text)}</text>`);
+      }
+    }
+    parts.push(`<circle cx="${fx}" cy="${y}" r="${SR}" fill="${circleFill}"/>`);
+    parts.push(`<text x="${fx}" y="${y+1}" text-anchor="middle" dominant-baseline="middle" font-family="${f}" font-size="9" font-weight="700" fill="${circleText}">${msg.displayStep ?? msg.step}</text>`);
+    if (o.coloredNumbers) {
+      parts.push(`<circle cx="22" cy="${y}" r="${SR}" fill="${fp.color}"/>`);
+      parts.push(`<text x="22" y="${y+1}" text-anchor="middle" dominant-baseline="middle" font-family="${f}" font-size="9" font-weight="700" fill="#000000">${msg.displayStep ?? msg.step}</text>`);
+    }
+  });
+  ps.forEach((p, i) => {
+    const x = cx(i)-BW/2, y = H-BOT_PAD-BH;
+    parts.push(`<rect x="${x}" y="${y}" width="${BW}" height="${BH}" rx="${BR}" fill="${p.color}" stroke="#000000" stroke-width="2"/>`);
+    parts.push(`<text x="${cx(i)}" y="${y+BH/2+1}" text-anchor="middle" dominant-baseline="middle" font-family="${f}" font-size="${FS}" font-weight="700" fill="white">${esc(p.label)}</text>`);
+  });
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${parts.join("")}</svg>`;
+}
+
+// ── Default code ──────────────────────────────────────────────────────────────
+const DEFAULT_CODE = `sequenceDiagram
+    title: Claude Code — AI Dev Loop
+
+    participant User
+    participant CC as Claude Code [CLI]
+    participant API as Claude API
+    participant MEM as Memory [CLAUDE.md]
+    participant MCP as MCP Server
+    participant FS as File System
+    participant SH as Shell / Bash
+    participant GIT as Git
+    participant AGT as Sub-Agent
+    participant WEB as Web Search
+
+    User->>CC: "Add auth to my app"
+    CC->>MEM: Load project context & rules
+    MEM-->>CC: CLAUDE.md + memory files
+    CC->>API: Task + tools + full context
+    API-->>CC: Reasoning plan + tool calls
+    CC->>FS: Read source files [Glob, Grep, Read]
+    FS-->>CC: Code structure & relevant files
+    CC->>MCP: Fetch external docs & schemas
+    MCP-->>CC: Reference data returned
+    CC->>AGT: Spawn sub-agent [research]
+    AGT->>WEB: Search auth best practices
+    WEB-->>AGT: OAuth2 & JWT patterns
+    AGT-->>CC: Research complete
+    CC->>FS: Write implementation [Edit, Write]
+    CC->>SH: Run tests & lint
+    SH-->>CC: All tests passing
+    CC->>GIT: Stage & commit changes
+    GIT-->>CC: Committed successfully
+    CC-->>User: Done — 3 files changed`;
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let code = localStorage.getItem("nsd-code") || DEFAULT_CODE;
+let opts = { coloredLines: true, coloredNumbers: true, coloredText: true, font: "Inter", lifelineDash: "circle" };
+let layout = { stepHeight: 42, boxWidth: 141, spacing: 250, textSize: 13, margin: 50 };
+let zoom = 1.0, fitActive = true;
+let editorDark = false;
+let currentSvg = "", svgW = 0, svgH = 0;
+
+try { const o = localStorage.getItem("nsd-opts"); if (o) opts = { ...opts, ...JSON.parse(o) }; } catch {}
+try { const l = localStorage.getItem("nsd-layout"); if (l) layout = { ...layout, ...JSON.parse(l) }; } catch {}
+
+// ── DOM refs ──────────────────────────────────────────────────────────────────
+const canvasEl       = document.getElementById("canvas");
+const svgWrap        = document.getElementById("svg-wrap");
+const svgContainer   = document.getElementById("svg-container");
+const emptyMsg       = document.getElementById("empty-msg");
+const zoomPctEl      = document.getElementById("zoom-pct");
+const fitBtn         = document.getElementById("fit-btn");
+const minimapEl      = document.getElementById("minimap");
+const minimapSvgWrap = document.getElementById("minimap-svg-wrap");
+const minimapVp      = document.getElementById("minimap-viewport");
+const codePanel      = document.getElementById("code-panel");
+const codeInner      = document.getElementById("code-inner");
+const codeEditor     = document.getElementById("code-editor");
+const copyBtn        = document.getElementById("copy-btn");
+const themeBtn       = document.getElementById("theme-btn");
+const dragHandle     = document.getElementById("drag-handle");
+const settingsPanel  = document.getElementById("settings-panel");
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function render() {
+  const diagram = parse(code);
+  currentSvg = buildSvg(diagram, opts, layout);
+  if (!currentSvg) {
+    svgContainer.style.display = "none";
+    emptyMsg.style.display = "flex";
+    minimapEl.style.display = "none";
+    return;
+  }
+  svgContainer.style.display = "flex";
+  emptyMsg.style.display = "none";
+  minimapEl.style.display = "block";
+  const m = currentSvg.match(/width="(\d+)" height="(\d+)"/);
+  if (m) { svgW = parseInt(m[1]); svgH = parseInt(m[2]); }
+  updateDisplay();
+}
+
+function updateDisplay() {
+  if (!currentSvg || !svgW) return;
+  const w = Math.round(svgW * zoom), h = Math.round(svgH * zoom);
+  svgWrap.innerHTML = currentSvg.replace(/width="\d+" height="\d+"/, `width="${w}" height="${h}"`);
+  zoomPctEl.textContent = Math.round(zoom * 100) + "%";
+  document.querySelectorAll(".zoom-preset").forEach(btn => {
+    btn.classList.toggle("active", !fitActive && parseInt(btn.dataset.pct) === Math.round(zoom * 100));
+  });
+  fitBtn.classList.toggle("active", fitActive);
+  updateMinimap();
+}
+
+// ── Minimap ───────────────────────────────────────────────────────────────────
+function updateMinimap() {
+  if (!currentSvg || !svgW) return;
+  const mmScale = Math.min(260 / svgW, 180 / svgH);
+  const mmW = Math.round(svgW * mmScale), mmH = Math.round(svgH * mmScale);
+  minimapEl.style.width  = mmW + "px";
+  minimapEl.style.height = mmH + "px";
+  minimapSvgWrap.innerHTML = currentSvg.replace(/width="\d+" height="\d+"/, `width="${mmW}" height="${mmH}"`);
+  const svgEl = svgWrap.querySelector("svg");
+  const canvasRect = canvasEl.getBoundingClientRect();
+  const svgLeft = svgEl ? svgEl.getBoundingClientRect().left - canvasRect.left + canvasEl.scrollLeft : 0;
+  const svgTop  = svgEl ? svgEl.getBoundingClientRect().top  - canvasRect.top  + canvasEl.scrollTop  : 0;
+  const vl = Math.max(0, (canvasEl.scrollLeft - svgLeft) / zoom);
+  const vt = Math.max(0, (canvasEl.scrollTop  - svgTop)  / zoom);
+  const vr = Math.min(svgW, (canvasEl.scrollLeft + canvasEl.clientWidth  - svgLeft) / zoom);
+  const vb = Math.min(svgH, (canvasEl.scrollTop  + canvasEl.clientHeight - svgTop)  / zoom);
+  const rx = Math.max(0, vl * mmScale);
+  const ry = Math.max(0, vt * mmScale);
+  minimapVp.style.left   = rx + "px";
+  minimapVp.style.top    = ry + "px";
+  minimapVp.style.width  = Math.max(8, Math.min(mmW - rx, (vr - vl) * mmScale)) + "px";
+  minimapVp.style.height = Math.max(8, Math.min(mmH - ry, (vb - vt) * mmScale)) + "px";
+}
+
+// ── Fit ───────────────────────────────────────────────────────────────────────
+function fitZoom() {
+  if (!svgW) return;
+  zoom = parseFloat(Math.min((canvasEl.clientWidth - 48) / svgW, (canvasEl.clientHeight - 48) / svgH).toFixed(3));
+  fitActive = true;
+  updateDisplay();
+}
+
+// ── Pan drag ──────────────────────────────────────────────────────────────────
+let isDragging = false;
+const dragOrigin = { x: 0, y: 0, sl: 0, st: 0 };
+
+canvasEl.addEventListener("mousedown", e => {
+  if (e.button !== 0 || e.target.closest("button")) return;
+  isDragging = true;
+  canvasEl.classList.add("dragging");
+  dragOrigin.x = e.clientX; dragOrigin.y = e.clientY;
+  dragOrigin.sl = canvasEl.scrollLeft; dragOrigin.st = canvasEl.scrollTop;
+  e.preventDefault();
+});
+window.addEventListener("mousemove", e => {
+  if (!isDragging) return;
+  canvasEl.scrollLeft = dragOrigin.sl - (e.clientX - dragOrigin.x);
+  canvasEl.scrollTop  = dragOrigin.st - (e.clientY - dragOrigin.y);
+});
+window.addEventListener("mouseup", () => {
+  if (isDragging) { isDragging = false; canvasEl.classList.remove("dragging"); }
+});
+canvasEl.addEventListener("scroll", updateMinimap);
+
+// ── Zoom controls ─────────────────────────────────────────────────────────────
+canvasEl.addEventListener("wheel", e => {
+  if (!e.ctrlKey && !e.metaKey) return;
+  e.preventDefault();
+  zoom = parseFloat(Math.min(3, Math.max(0.2, zoom - e.deltaY * (e.deltaMode === 1 ? 0.06 : 0.004))).toFixed(3));
+  fitActive = false;
+  updateDisplay();
+}, { passive: false });
+
+document.getElementById("zoom-out").addEventListener("click", () => { zoom = parseFloat(Math.max(0.2, zoom - 0.1).toFixed(2)); fitActive = false; updateDisplay(); });
+document.getElementById("zoom-in").addEventListener("click",  () => { zoom = parseFloat(Math.min(3, zoom + 0.1).toFixed(2));  fitActive = false; updateDisplay(); });
+document.querySelectorAll(".zoom-preset").forEach(btn => {
+  btn.addEventListener("click", () => { zoom = parseInt(btn.dataset.pct) / 100; fitActive = false; updateDisplay(); });
+});
+fitBtn.addEventListener("click", fitZoom);
+
+// ── Minimap click-to-navigate ─────────────────────────────────────────────────
+minimapEl.addEventListener("click", e => {
+  if (!svgW) return;
+  const rect = minimapEl.getBoundingClientRect();
+  const svgX = ((e.clientX - rect.left) / minimapEl.offsetWidth)  * svgW;
+  const svgY = ((e.clientY - rect.top)  / minimapEl.offsetHeight) * svgH;
+  const svgEl = svgWrap.querySelector("svg");
+  const canvasRect = canvasEl.getBoundingClientRect();
+  const svgLeft = svgEl ? svgEl.getBoundingClientRect().left - canvasRect.left + canvasEl.scrollLeft : 0;
+  const svgTop  = svgEl ? svgEl.getBoundingClientRect().top  - canvasRect.top  + canvasEl.scrollTop  : 0;
+  canvasEl.scrollLeft = svgLeft + svgX * zoom - canvasEl.clientWidth  / 2;
+  canvasEl.scrollTop  = svgTop  + svgY * zoom - canvasEl.clientHeight / 2;
+});
+
+// ── Code editor ───────────────────────────────────────────────────────────────
+codeEditor.value = code;
+codeEditor.addEventListener("input", () => {
+  code = codeEditor.value;
+  localStorage.setItem("nsd-code", code);
+  render();
+});
+
+// ── Panels ────────────────────────────────────────────────────────────────────
+document.getElementById("code-toggle-btn").addEventListener("click", () => {
+  const show = codePanel.style.display === "none";
+  codePanel.style.display = show ? "flex" : "none";
+  document.getElementById("code-toggle-btn").classList.toggle("active", show);
+  requestAnimationFrame(fitZoom);
+});
+document.getElementById("settings-toggle-btn").addEventListener("click", () => {
+  const show = settingsPanel.style.display === "none";
+  settingsPanel.style.display = show ? "flex" : "none";
+  document.getElementById("settings-toggle-btn").classList.toggle("active", show);
+  requestAnimationFrame(fitZoom);
+});
+document.getElementById("settings-close").addEventListener("click", () => {
+  settingsPanel.style.display = "none";
+  document.getElementById("settings-toggle-btn").classList.remove("active");
+  requestAnimationFrame(fitZoom);
+});
+
+// ── Code panel resize ─────────────────────────────────────────────────────────
+let isResizing = false, resizeStartX = 0, resizeStartW = 340;
+dragHandle.addEventListener("mousedown", e => {
+  isResizing = true; resizeStartX = e.clientX; resizeStartW = codePanel.offsetWidth;
+  document.body.style.cursor = "col-resize"; document.body.style.userSelect = "none";
+  e.preventDefault();
+});
+window.addEventListener("mousemove", e => {
+  if (!isResizing) return;
+  codePanel.style.width = Math.max(220, Math.min(780, resizeStartW + (e.clientX - resizeStartX))) + "px";
+});
+window.addEventListener("mouseup", () => {
+  if (isResizing) { isResizing = false; document.body.style.cursor = ""; document.body.style.userSelect = ""; }
+});
+
+// ── Editor theme ──────────────────────────────────────────────────────────────
+themeBtn.addEventListener("click", () => {
+  editorDark = !editorDark;
+  codeInner.classList.toggle("dark", editorDark);
+  themeBtn.textContent = editorDark ? "☀️" : "🌙";
+});
+
+// ── Copy ──────────────────────────────────────────────────────────────────────
+function doCopy() {
+  navigator.clipboard.writeText(code).then(() => {
+    copyBtn.textContent = "✓ Copied"; copyBtn.classList.add("copied");
+    const expCopy = document.getElementById("export-copy");
+    expCopy.style.background = "#34c759"; expCopy.textContent = "✓ Copied";
+    setTimeout(() => {
+      copyBtn.textContent = "Copy"; copyBtn.classList.remove("copied");
+      expCopy.style.background = "#8b5cf6"; expCopy.textContent = "Copy";
+    }, 1500);
+  });
+}
+copyBtn.addEventListener("click", doCopy);
+document.getElementById("export-copy").addEventListener("click", doCopy);
+
+// ── Settings toggles ──────────────────────────────────────────────────────────
+function syncToggles() {
+  document.querySelectorAll(".toggle-row[data-opt]").forEach(row => {
+    row.querySelector(".toggle-switch").classList.toggle("on", opts[row.dataset.opt]);
+  });
+  document.getElementById("lifeline-select").value = opts.lifelineDash;
+}
+document.querySelectorAll(".toggle-row[data-opt]").forEach(row => {
+  row.addEventListener("click", () => {
+    opts[row.dataset.opt] = !opts[row.dataset.opt];
+    syncToggles();
+    localStorage.setItem("nsd-opts", JSON.stringify(opts));
+    render();
+  });
+});
+document.getElementById("lifeline-select").addEventListener("change", e => {
+  opts.lifelineDash = e.target.value;
+  localStorage.setItem("nsd-opts", JSON.stringify(opts));
+  render();
+});
+syncToggles();
+
+// ── Sliders ───────────────────────────────────────────────────────────────────
+[["stepHeight",""],["boxWidth",""],["spacing",""],["textSize","px"],["margin",""]].forEach(([key, unit]) => {
+  const sl = document.getElementById("sl-" + key);
+  const vl = document.getElementById("val-" + key);
+  sl.value = layout[key]; vl.textContent = layout[key] + unit;
+  sl.addEventListener("input", () => {
+    layout[key] = parseInt(sl.value);
+    vl.textContent = sl.value + unit;
+    localStorage.setItem("nsd-layout", JSON.stringify(layout));
+    render();
+  });
+});
+
+// ── Exports ───────────────────────────────────────────────────────────────────
+const EXPORT_LAYOUT = { stepHeight: 58, boxWidth: 160, spacing: 210, textSize: 14, margin: 60 };
+document.getElementById("export-png").addEventListener("click", () => {
+  const expSvg = buildSvg(parse(code), opts, EXPORT_LAYOUT);
+  if (!expSvg) return;
+  const url = URL.createObjectURL(new Blob([expSvg], { type: "image/svg+xml" }));
+  const img = new Image();
+  img.onload = () => {
+    const c = document.createElement("canvas");
+    c.width = img.width * 2; c.height = img.height * 2;
+    const ctx = c.getContext("2d");
+    ctx.scale(2, 2); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, img.width, img.height);
+    ctx.drawImage(img, 0, 0);
+    c.toBlob(b => { if (!b) return; const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = "sequence.png"; a.click(); });
+    URL.revokeObjectURL(url);
+  };
+  img.src = url;
+});
+document.getElementById("export-code").addEventListener("click", () => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([code], { type: "text/plain" }));
+  a.download = "diagram.txt"; a.click();
+});
+document.getElementById("export-json").addEventListener("click", () => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(parse(code), null, 2)], { type: "application/json" }));
+  a.download = "diagram.json"; a.click();
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+render();
+requestAnimationFrame(fitZoom);
+</script>
+</body>
+</html>
