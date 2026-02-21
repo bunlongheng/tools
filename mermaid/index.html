@@ -392,10 +392,9 @@ function buildSvg(d, o, l) {
     const fp = ps[fi];
     const lc = o.coloredLines ? fp.color : "#374151";
     const tc = o.coloredText ? fp.color : "#1e293b";
-    const circleFill = o.coloredNumbers ? fp.color : "#1c1c1c";
-    const circleText = o.coloredNumbers ? "#000000" : "white";
     if (fi === ti) {
-      parts.push(`<path d="M${fx} ${y} H${fx+SW} V${y+SH} H${fx}" fill="none" stroke="${lc}" stroke-width="1.5"/>`);
+      const da = msg.arrow === "dashed" ? ` stroke-dasharray="6 3"` : "";
+      parts.push(`<path d="M${fx} ${y} H${fx+SW} V${y+SH} H${fx}" fill="none" stroke="${lc}" stroke-width="1.5"${da}/>`);
       parts.push(`<polygon points="${fx},${y+SH} ${fx+AH},${y+SH-5} ${fx+AH},${y+SH+5}" fill="${lc}"/>`);
       if (o.coloredText) {
         const pillH = FS+8, pillW = Math.max(40, msg.text.length*(FS*0.62)+12);
@@ -407,9 +406,15 @@ function buildSvg(d, o, l) {
       }
     } else {
       const dir = tx > fx ? 1 : -1;
-      parts.push(`<line x1="${fx}" y1="${y}" x2="${tx-dir*AH}" y2="${y}" stroke="${lc}" stroke-width="1.5"/>`);
-      if (dir===1) parts.push(`<polygon points="${tx},${y} ${tx-AH},${y-5} ${tx-AH},${y+5}" fill="${lc}"/>`);
-      else         parts.push(`<polygon points="${tx},${y} ${tx+AH},${y-5} ${tx+AH},${y+5}" fill="${lc}"/>`);
+      const da = msg.arrow === "dashed" ? ` stroke-dasharray="6 3"` : "";
+      parts.push(`<line x1="${fx}" y1="${y}" x2="${tx-dir*AH}" y2="${y}" stroke="${lc}" stroke-width="1.5"${da}/>`);
+      if (msg.arrow === "solid") {
+        if (dir===1) parts.push(`<polygon points="${tx},${y} ${tx-AH},${y-5} ${tx-AH},${y+5}" fill="${lc}"/>`);
+        else         parts.push(`<polygon points="${tx},${y} ${tx+AH},${y-5} ${tx+AH},${y+5}" fill="${lc}"/>`);
+      } else {
+        if (dir===1) parts.push(`<polyline points="${tx-AH},${y-5} ${tx},${y} ${tx-AH},${y+5}" fill="none" stroke="${lc}" stroke-width="1.5"/>`);
+        else         parts.push(`<polyline points="${tx+AH},${y-5} ${tx},${y} ${tx+AH},${y+5}" fill="none" stroke="${lc}" stroke-width="1.5"/>`);
+      }
       const mid = (fx+tx)/2;
       if (o.coloredText) {
         const pillH = FS+8, pillW = Math.max(40, msg.text.length*(FS*0.62)+12);
@@ -420,11 +425,10 @@ function buildSvg(d, o, l) {
         parts.push(`<text x="${mid}" y="${y-8}" text-anchor="middle" font-family="${f}" font-size="${FS}" fill="${tc}">${esc(msg.text)}</text>`);
       }
     }
-    parts.push(`<circle cx="${fx}" cy="${y}" r="${SR}" fill="${circleFill}"/>`);
-    parts.push(`<text x="${fx}" y="${y+1}" text-anchor="middle" dominant-baseline="middle" font-family="${f}" font-size="9" font-weight="700" fill="${circleText}">${msg.displayStep ?? msg.step}</text>`);
+    // Step number — plain black, no circle
+    parts.push(`<text x="${fx}" y="${y+1}" text-anchor="middle" dominant-baseline="middle" font-family="${f}" font-size="13" font-weight="700" fill="#000000">${msg.displayStep ?? msg.step}</text>`);
     if (o.coloredNumbers) {
-      parts.push(`<circle cx="22" cy="${y}" r="${SR}" fill="${fp.color}"/>`);
-      parts.push(`<text x="22" y="${y+1}" text-anchor="middle" dominant-baseline="middle" font-family="${f}" font-size="9" font-weight="700" fill="#000000">${msg.displayStep ?? msg.step}</text>`);
+      parts.push(`<text x="22" y="${y+1}" text-anchor="middle" dominant-baseline="middle" font-family="${f}" font-size="13" font-weight="700" fill="#000000">${msg.displayStep ?? msg.step}</text>`);
     }
   });
   ps.forEach((p, i) => {
