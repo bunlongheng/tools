@@ -393,7 +393,7 @@ function buildSvg(d, o, l) {
     const lc = o.coloredLines ? fp.color : "#374151";
     const tc = o.coloredText ? fp.color : "#1e293b";
     if (fi === ti) {
-      const da = msg.arrow === "dashed" ? ` stroke-dasharray="6 3"` : "";
+      const da = msg.arrow === "dashed" ? ` stroke-dasharray="12 5"` : "";
       parts.push(`<path d="M${fx} ${y} H${fx+SW} V${y+SH} H${fx}" fill="none" stroke="${lc}" stroke-width="1.5"${da}/>`);
       parts.push(`<polygon points="${fx},${y+SH} ${fx+AH},${y+SH-5} ${fx+AH},${y+SH+5}" fill="${lc}"/>`);
       if (o.coloredText) {
@@ -406,7 +406,7 @@ function buildSvg(d, o, l) {
       }
     } else {
       const dir = tx > fx ? 1 : -1;
-      const da = msg.arrow === "dashed" ? ` stroke-dasharray="6 3"` : "";
+      const da = msg.arrow === "dashed" ? ` stroke-dasharray="12 5"` : "";
       parts.push(`<line x1="${fx}" y1="${y}" x2="${tx-dir*AH}" y2="${y}" stroke="${lc}" stroke-width="1.5"${da}/>`);
       if (msg.arrow === "solid") {
         if (dir===1) parts.push(`<polygon points="${tx},${y} ${tx-AH},${y-5} ${tx-AH},${y+5}" fill="${lc}"/>`);
